@@ -1,7 +1,7 @@
+import crypto from 'crypto';
 import envPaths from 'env-paths';
 import fs from 'fs/promises';
 import path from 'path';
-import { v4 as uuidv4 } from 'uuid';
 
 interface HeartbeatInfo {
     heartbeat: string;
@@ -85,7 +85,7 @@ async function setCurrentHeartbeat(): Promise<void> {
     await fs.writeFile(
         heartbeatFilePath,
         JSON.stringify(<HeartbeatInfo>{
-            heartbeat: uuidv4(),
+            heartbeat: crypto.randomBytes(16).toString('hex'),
         }),
     );
 }
