@@ -23,6 +23,9 @@ HEALTHCHECK --interval=15s --retries=3 --timeout=5s \
     CMD ["node", "healthcheck.js"]
 ```
 
+If you use AWS ECS, then keep in mind [ECS ignores Dockerfile's HEALTHCHECK](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_definition_parameters.html#container_definition_healthcheck). You need to put the healthcheck command in task definition. Similarly,
+Kubernetes ignores `Dockerfile`'s `HEALTHCHECK` too, and provides an alternative way to check health. However, you can use our library in either case.
+
 # Usage in your task's code
 
 The healthcheck process checks if the heartbeat has been signaled recently. If you do not
