@@ -44,6 +44,34 @@ for (let i = 0; i < 1000; i++) {
 }
 ```
 
+If you are processing streams in a pipeline, you can also signal heartbeat automatically
+as chunks are processed using `createHeartbeatStream` transform stream:
+
+```js
+import { createHeartbeatStream } from '@mangosteen/background-healthcheck';
+import stream from 'stream';
+import fs from 'fs';
+import { promisify } from 'util';
+const pipeline = promisify(stream.pipeline);
+
+(async () => {
+    await pipeline(
+        fs.createReadStream('./shakespeare.txt'),
+        createHeartbeatStream({ interval: 2000 }),
+        createSinkStream(),
+    );
+})();
+
+function createSinkStream(): stream.Writable {
+    return new stream.Writable({
+        highWaterMark: 0,
+        write(chunk, _encoding, callback): void {
+            callback();
+        },
+    });
+}
+```
+
 # What is it good for?
 
 Imagine running a Docker task in AWS Elastic Container Service, on EC2 or Fargate. This task is not a server,

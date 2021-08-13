@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import stream from 'stream';
 import envPaths from 'env-paths';
 import fs from 'fs/promises';
 import path from 'path';
@@ -27,6 +28,62 @@ export async function signalHeartbeat(): Promise<void> {
     } finally {
         currentHeartbeat = undefined;
     }
+}
+
+/**
+ * Signal heartbeat while data flows through this transform stream.
+ * @param options Specify options to customize the transform stream.
+ * @returns Heartbeat transform stream.
+ */
+export function createHeartbeatStream(
+    options?: {
+        /**
+         * How often to signal heartbeat, in milliseconds.
+         * If omitted, will signal heartbeat for each chunk of data.
+         */
+        interval?: number,
+        /** Whether to operate in object mode. */
+        objectMode?: boolean,
+    },
+): stream.Transform {
+    let lastNotifyTimestamp: number | undefined = undefined;
+
+    function tick(): Promise<void> {
+        const now = Date.now();
+        const reportProgress = options?.interval == null || lastNotifyTimestamp == null || lastNotifyTimestamp + options.interval <= now;
+
+        if (reportProgress) {
+            lastNotifyTimestamp = now;
+            return signalHeartbeat();
+        } else {
+            return Promise.resolve();
+        }
+    }
+
+    return new stream.Transform({
+        allowHalfOpen: false,
+        autoDestroy: true,
+        decodeStrings: false,
+        emitClose: true,
+        objectMode: options?.objectMode,
+
+        transform(chunk, encoding, callback): void {
+            tick().then(
+                () => {
+                    this.push(chunk, encoding);
+                    callback();
+                },
+                callback,
+            );
+        },
+
+        flush(callback): void {
+            tick().then(
+                () => callback(),
+                callback,
+            );
+        },
+    });
 }
 
 /**
