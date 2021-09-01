@@ -205,7 +205,7 @@ async function readFileContent(filePath: string): Promise<string | undefined> {
         const fileContent = await fs.readFile(filePath);
         return fileContent.toString('utf8');
     } catch (error) {
-        if (error.code === 'ENOENT') {
+        if ((error as any)?.code === 'ENOENT') {
             return undefined;
         } else {
             throw error;
