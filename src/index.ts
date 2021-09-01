@@ -1,8 +1,9 @@
 import crypto from 'crypto';
-import stream from 'stream';
 import envPaths from 'env-paths';
 import fs from 'fs/promises';
 import path from 'path';
+import { performance } from 'perf_hooks';
+import stream from 'stream';
 import writeFileAtomic from 'write-file-atomic';
 
 /** Path to the data directory where we store heartbeat info */
@@ -50,7 +51,7 @@ export function createHeartbeatStream(
     let lastNotifyTimestamp: number | undefined = undefined;
 
     function tick(): Promise<void> {
-        const now = Date.now();
+        const now = performance.now();
         const shouldSignal = options?.interval == null || lastNotifyTimestamp == null || lastNotifyTimestamp + options.interval <= now;
 
         if (shouldSignal) {
@@ -113,7 +114,7 @@ export async function healthcheck(staleInterval = 10000): Promise<number> {
     }
 
     // Healthy if the heartbeat has been stale for at most the specified interval
-    if (Date.now() - lastSeen.timestamp < staleInterval) {
+    if (performance.now() - lastSeen.timestamp < staleInterval) {
         return 0;
     }
 
@@ -177,7 +178,7 @@ function setLastSeenHeartbeat(heartbeat: string): Promise<void> {
         lastSeenFilePath,
         JSON.stringify(<HeartbeatCheck>{
             heartbeat: heartbeat,
-            timestamp: Date.now(),
+            timestamp: performance.now(),
         }),
     );
 }
