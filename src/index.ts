@@ -3,6 +3,7 @@ import stream from 'stream';
 import envPaths from 'env-paths';
 import fs from 'fs/promises';
 import path from 'path';
+import writeFileAtomic from 'write-file-atomic';
 
 /** Path to the data directory where we store heartbeat info */
 const dataDirPath = envPaths('app-container', {
@@ -190,10 +191,7 @@ async function writeFileContent(filePath: string, content: string): Promise<void
         path.dirname(filePath),
         { recursive: true, },
     );
-    await fs.writeFile(
-        filePath,
-        content,
-    );
+    await writeFileAtomic(filePath, content);
 }
 
 /** Get file contents. Returns `undefined` if the file doesn't exist. */
