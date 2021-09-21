@@ -17,6 +17,9 @@ let currentHeartbeat: Promise<void> | undefined;
 /** Used to avoid heartbeats from signaling too often (to minimize I/O). */
 let lastHeartbeatTimestamp: number | undefined;
 
+/** Is heartbeat signaling enabled? */
+let signalingEnabled = true;
+
 /**
  * Signal heartbeat to the healthcheck process.
  * Signaling is done by generating a new random heartbeat value.
@@ -30,7 +33,7 @@ export async function signalHeartbeat(interval?: number): Promise<void> {
     // Ignore heartbeats called more often than `interval`
     const shouldSignal = !interval || lastHeartbeatTimestamp == null || lastHeartbeatTimestamp + interval <= performance.now();
 
-    if (shouldSignal) {
+    if (shouldSignal && signalingEnabled) {
         // Don't issue a new heartbeat if there is a concurrent heartbeat
         if (currentHeartbeat != null) {
             return await currentHeartbeat;
@@ -46,6 +49,22 @@ export async function signalHeartbeat(interval?: number): Promise<void> {
             currentHeartbeat = undefined;
         }
     }
+}
+
+/**
+ * Enables/disables heartbeat signaling. When disabled, calling `signalHeartbeat` will have no effect.
+ * @param enable `true` to enable signaling; `false` to disable signaling.
+ */
+export function enableHeartbeatSignaling(enable: boolean): void {
+    signalingEnabled = enable;
+}
+
+/**
+ * Gets a value indicating whether heartbeat signaling is allowed.
+ * @returns `true` if signaling is enabled; otherwise `false`.
+ */
+export function isHeartbeatSignalingEnabled(): boolean {
+    return signalingEnabled;
 }
 
 /**
