@@ -136,7 +136,7 @@ export async function healthcheck(staleInterval = 10000): Promise<number> {
     }
 
     // Healthy if the heartbeat has been stale for at most the specified interval
-    if (performance.now() - lastSeen.timestamp < staleInterval) {
+    if (Date.now() - lastSeen.timestamp < staleInterval) {
         return 0;
     }
 
@@ -201,7 +201,7 @@ function setLastSeenHeartbeat(heartbeat: string): Promise<void> {
         lastSeenFilePath,
         JSON.stringify(<HeartbeatCheck>{
             heartbeat: heartbeat,
-            timestamp: performance.now(),
+            timestamp: Date.now(),
         }),
     );
 }
