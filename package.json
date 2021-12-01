@@ -1,6 +1,6 @@
 {
     "name": "@mangosteen/background-healthcheck",
-    "version": "2.0.0",
+    "version": "2.1.0",
     "description": "Healthcheck for containerized background tasks",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
