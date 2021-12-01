@@ -16,7 +16,10 @@ import { healthcheck } from '@mangosteen/background-healthcheck';
 healthcheck(10000).then(process.exit);
 ```
 
-And configure your `Dockerfile`:
+The value `10000` is a `staleInterval` param. If you signal heartbeat less often
+than `staleInterval`, the container will be reported as unhealthy.
+
+The next step is to configure your `Dockerfile`:
 
 ```dockerfile
 HEALTHCHECK --interval=15s --retries=3 --timeout=5s \
@@ -28,36 +31,65 @@ Kubernetes ignores `Dockerfile`'s `HEALTHCHECK` too, and provides an alternative
 
 # Usage in your task's code
 
-The healthcheck process checks if the heartbeat has been signaled recently. If you do not
-call the `signalHeartbeat` periodically, the healthcheck will report your container as
-unhealthy. Pay special attention to async functions that take a long time to complete.
+The healthcheck process checks if the heartbeat has been signaled recently. If you do not signal heartbeat
+periodically, the healthcheck will report your container as unhealthy. Pay special attention to async functions
+that take a long time to complete.
 
-You can customize the heartbeat period using `staleInterval` param of the `healthcheck` function.
-If you signal heartbeat less often than `staleInterval`, the container will be unhealthy.
+To begin, create a new `ModuleHeartbeat` instance:
 
-```js
-import { signalHeartbeat } from '@mangosteen/background-healthcheck';
+```ts
+import { ModuleHeartbeat } from '@mangosteen/background-healthcheck';
 
+const appModule = new ModuleHeartbeat('app', 2000);
+```
+
+This creates a new heartbeat module. In this example, the module represents the entire app and we assume this will be the only module you use in the entire app. Alternativaly, if your app has multiple submodules that you would like to healthcheck more granuarly, you can create an arbitrary number of modules in your app. If any module becomes unhealthy, the entire app is considered unhealthy.
+
+The `ModuleHeartbeat` constructor accepts two arguments:
+* `moduleName` (`string`)  
+Arbitrary string that identifies the module. Two module instances with the same name are interchangeable.
+* [`interval`] (`number`)  
+Optional number of milliseconds limiting the frequency at which the heartbeat is reported (to reduce disk I/O).  
+`Default: 2000`
+
+To signal a heartbeat, just call the `signal` method of a module:
+
+
+```ts
 for (let i = 0; i < 1000; i++) {
     await insertRowsBatchToDb();
-    await signalHeartbeat();
+    await appModule.signal();
 }
 ```
 
-If you are processing streams in a pipeline, you can also signal heartbeat automatically
-as chunks are processed using `createHeartbeatStream` transform stream:
+If you want to signal a heartbeat during a long-running network request, and you cannot add calls to `signal` at more granular level, you can use `signalWhile` to issue heartbeats periodically:
 
-```js
-import { createHeartbeatStream } from '@mangosteen/background-healthcheck';
+```ts
+const action: PromiseLike<T> = ....
+
+const actionResult: T = await appModule.signalWhile(
+    action,
+    30000,
+);
+```
+
+This code will signal heartbeats during the first `30.000ms` or until the `action` promise resolves, whichever happens earlier.
+
+If you are processing streams in a pipeline, you can also signal heartbeat automatically as chunks are processed using `createHeartbeatStream` transform stream:
+
+```ts
+import { createHeartbeatStream, ModuleHeartbeat } from '@mangosteen/background-healthcheck';
 import stream from 'stream';
 import fs from 'fs';
 import { promisify } from 'util';
+
 const pipeline = promisify(stream.pipeline);
+const appModule = new ModuleHeartbeat('app');
 
 (async () => {
     await pipeline(
         fs.createReadStream('./shakespeare.txt'),
-        createHeartbeatStream({ interval: 2000 }),
+        createHeartbeatStream({ heartbeat: appModule }),
         createSinkStream(),
     );
 })();
