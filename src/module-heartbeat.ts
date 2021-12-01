@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { performance } from 'perf_hooks';
 import { deleteFile, writeFileJson } from './lib/fs-utils';
 import { ModuleHeartbeatInfo } from './lib/models';
 
@@ -32,7 +33,7 @@ export class ModuleHeartbeat implements HeartbeatService {
          */
         interval?: number,
     ) {
-        this.interval = interval;
+        this.interval = interval ?? 2000;
         this._fileName = `${sha256(moduleName)}.json`;
     }
 
@@ -70,7 +71,7 @@ export class ModuleHeartbeat implements HeartbeatService {
         // Ignore heartbeats called more often than `interval`
         const shouldSignal = !this._interval
             || this._lastHeartbeatTimestamp == null
-            || this._lastHeartbeatTimestamp + this._interval <= Date.now();
+            || this._lastHeartbeatTimestamp + this._interval <= performance.now();
     
         if (shouldSignal) {
             // Don't issue a new heartbeat if there is a concurrent signal
@@ -90,6 +91,62 @@ export class ModuleHeartbeat implements HeartbeatService {
         }
     }
 
+    /**
+     * Signal heartbeat repeatedly until the specified `action` is resolved. If `timeout` is specified,
+     * heartbeat will be signaled only during the first `timeout` milliseconds.
+     * 
+     * @param action A `Promise` to wait for and keep signaling heartbeat until it is completed.
+     * @param timeout The maximum number of milliseconds during which to signal heartbeat.
+     * @returns The resolved value of `action`.
+     */
+    async signalWhile<T>(
+        action: PromiseLike<T>,
+        timeout?: number,
+    ): Promise<T> {
+        await this.signal();
+
+        const timeoutObj = Symbol();
+        const start = performance.now();
+
+        while (true) {
+            // How long to wait before signaling heartbeat
+            let waitTime = this._interval ?? 1000;
+
+            // Limit the heartbeat period
+            if (timeout != null) {
+                const elapsed = performance.now() - start;
+                const remaining = timeout - elapsed;
+
+                // If we reached timeout, do not signal heartbeats anymore
+                if (remaining <= 0) {
+                    return await action;
+                }
+
+                waitTime = Math.min(waitTime, remaining);
+            }
+
+            let timeoutId!: NodeJS.Timeout;
+            const timeoutPromise = new Promise<typeof timeoutObj>(resolve => {
+                timeoutId = setTimeout(resolve, waitTime, timeoutObj);
+            });
+
+            try {
+                const result = await Promise.race([
+                    action,
+                    timeoutPromise,
+                ]);
+
+                await this.signal();
+
+                if (result !== timeoutObj) {
+                    return result;
+                }
+            } finally {
+                clearTimeout(timeoutId);
+            }
+        }
+    }
+
     /** Stop checking the module health. */
     async stop(): Promise<void> {
         await deleteFile(this._fileName)
@@ -105,7 +162,7 @@ export class ModuleHeartbeat implements HeartbeatService {
         };
 
         await writeFileJson(this._fileName, payload);
-        this._lastHeartbeatTimestamp = Date.now();
+        this._lastHeartbeatTimestamp = performance.now();
     }
 }
 
