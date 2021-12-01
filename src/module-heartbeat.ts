@@ -147,6 +147,26 @@ export class ModuleHeartbeat implements HeartbeatService {
         }
     }
 
+    /**
+     * Sleep for the specified number of milliseconds, while signaling heartbeat at the same time.
+     * @param ms The number of milliseconds to sleep.
+     */
+    async sleep(ms: number): Promise<void> {
+        await this.signal();
+
+        while (ms > 0) {
+            const wait = Math.min(ms, this._interval ?? 1000);
+    
+            await new Promise(resolve => {
+                setTimeout(resolve, wait);
+            });
+
+            await this.signal();
+    
+            ms -= wait;
+        }
+    }
+
     /** Stop checking the module health. */
     async stop(): Promise<void> {
         await deleteFile(this._fileName)
