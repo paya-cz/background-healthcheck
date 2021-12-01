@@ -30,6 +30,8 @@ export class ModuleHeartbeat implements HeartbeatService {
          * How often to signal heartbeats, in milliseconds.
          * Any heartbeat signal issued within `interval` ms from the last signal will be ignored (to reduce disk I/O).
          * If omitted, heartbeat will be signaled every time.
+         * 
+         * Default: `2000`
          */
         interval?: number,
     ) {
