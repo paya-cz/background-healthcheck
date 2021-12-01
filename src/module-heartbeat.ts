@@ -24,19 +24,23 @@ export class ModuleHeartbeat implements HeartbeatService {
          * This can be arbitrary `string` used to distinguish different modules in a single app,
          * in case you need to perform healthcheck on a more granular level.
          * You may also use just a single module name for the entire app if you do not need extra granularity.
+         * If you do not specify a module name, a new random name is generated.
+         * 
+         * **Default:** globally-unique randomly generated name (256-bit entropy)
          */
-        readonly moduleName: string,
+        moduleName?: string,
         /**
          * How often to signal heartbeats, in milliseconds.
          * Any heartbeat signal issued within `interval` ms from the last signal will be ignored (to reduce disk I/O).
          * If omitted, heartbeat will be signaled every time.
          * 
-         * Default: `2000`
+         * **Default:** `2000`
          */
         interval?: number,
     ) {
+        this.moduleName = moduleName ?? crypto.randomBytes(32).toString('hex');
         this.interval = interval ?? 2000;
-        this._fileName = `${sha256(moduleName)}.json`;
+        this._fileName = `${sha256(this.moduleName)}.json`;
     }
 
     private _interval?: number;
@@ -49,6 +53,14 @@ export class ModuleHeartbeat implements HeartbeatService {
 
     /** To avoid heartbeats from signaling too often. */
     private _lastHeartbeatTimestamp: number | undefined;
+
+    /**
+     * The name of the module.
+     * This can be arbitrary `string` used to distinguish different modules in a single app,
+     * in case you need to perform healthcheck on a more granular level.
+     * You may also use just a single module name for the entire app if you do not need extra granularity.
+     */
+    readonly moduleName: string;
     
     /**
      * How often to signal heartbeats, in milliseconds.

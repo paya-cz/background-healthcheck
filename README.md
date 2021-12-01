@@ -46,8 +46,9 @@ const appModule = new ModuleHeartbeat('app', 2000);
 This creates a new heartbeat module. In this example, the module represents the entire app and we assume this will be the only module you use in the entire app. Alternativaly, if your app has multiple submodules that you would like to healthcheck more granuarly, you can create an arbitrary number of modules in your app. If any module becomes unhealthy, the entire app is considered unhealthy.
 
 The `ModuleHeartbeat` constructor accepts two arguments:
-* `moduleName` (`string`)  
-Arbitrary string that identifies the module. Two module instances with the same name are interchangeable.
+* [`moduleName`] (`string`)  
+Optional arbitrary string that identifies the module. Two module instances with the same name are interchangeable.  
+`Default: globally-unique randomly generated name (256-bit entropy)`
 * [`interval`] (`number`)  
 Optional number of milliseconds limiting the frequency at which the heartbeat is reported (to reduce disk I/O).  
 `Default: 2000`
@@ -84,7 +85,7 @@ import fs from 'fs';
 import { promisify } from 'util';
 
 const pipeline = promisify(stream.pipeline);
-const appModule = new ModuleHeartbeat('app');
+const appModule = new ModuleHeartbeat();
 
 (async () => {
     await pipeline(
