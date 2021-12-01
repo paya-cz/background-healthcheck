@@ -1,13 +1,20 @@
 import envPaths from 'env-paths';
 import fs from 'fs';
 import path from 'path';
-// import process from 'process';
 import writeFileAtomic from 'write-file-atomic';
 
 /** Path to the data directory where we store heartbeat info */
 const dataDirPath = envPaths('heartbeat-820d15cef9ae45b794b91c30dc1d9cce', {
     suffix: '',
 }).data;
+
+export async function cleanup(): Promise<void> {
+    await fs.promises.rm(dataDirPath, {
+        force: true,
+        recursive: true,
+        maxRetries: 3,
+    });
+}
 
 export async function listHeartbeatFiles() {
     const files = await fs.promises.readdir(dataDirPath, {

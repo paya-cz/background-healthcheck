@@ -1,7 +1,8 @@
 import crypto from 'crypto';
-import { performance } from 'perf_hooks';
 import { deleteFile, writeFileJson } from './lib/fs-utils';
 import { ModuleHeartbeatInfo } from './lib/models';
+
+export { cleanup } from './lib/fs-utils';
 
 /** Heartbeat service implementation. */
 export interface HeartbeatService {
@@ -11,28 +12,28 @@ export interface HeartbeatService {
 
 /**
  * Heartbeat service for a module.
- * A module can be the entire app, or a more granular tasks within a single app.
+ * A module can be the entire app, or a more granular task within a single app.
  * The healthcheck will be done across all the modules you have used.
- * To stop a module from being checked, use `destroy`.
+ * To stop a module from being checked, use `stop`.
  */
 export class ModuleHeartbeat implements HeartbeatService {
     constructor(
         /**
-         * The name of the app module.
+         * The name of the module.
          * This can be arbitrary `string` used to distinguish different modules in a single app,
          * in case you need to perform healthcheck on a more granular level.
-         * You may also use just a single module name for the entire app.
+         * You may also use just a single module name for the entire app if you do not need extra granularity.
          */
         readonly moduleName: string,
         /**
          * How often to signal heartbeats, in milliseconds.
          * Any heartbeat signal issued within `interval` ms from the last signal will be ignored (to reduce disk I/O).
-         * If omitted, will signal heartbeat every time.
+         * If omitted, heartbeat will be signaled every time.
          */
         interval?: number,
     ) {
         this.interval = interval;
-        this._fileName = `${sha256(moduleName)}.beat`;
+        this._fileName = `${sha256(moduleName)}.json`;
     }
 
     private _interval?: number;
@@ -49,7 +50,7 @@ export class ModuleHeartbeat implements HeartbeatService {
     /**
      * How often to signal heartbeats, in milliseconds.
      * Any heartbeat signal issued within `interval` ms from the last signal will be ignored (to reduce disk I/O).
-     * If omitted, will signal heartbeat every time.
+     * If omitted, heartbeat will be signaled every time.
      */
     get interval(): number | undefined {
         return this._interval;
@@ -69,10 +70,10 @@ export class ModuleHeartbeat implements HeartbeatService {
         // Ignore heartbeats called more often than `interval`
         const shouldSignal = !this._interval
             || this._lastHeartbeatTimestamp == null
-            || this._lastHeartbeatTimestamp + this._interval <= performance.now();
+            || this._lastHeartbeatTimestamp + this._interval <= Date.now();
     
         if (shouldSignal) {
-            // Don't issue a new heartbeat if there is a concurrent one already
+            // Don't issue a new heartbeat if there is a concurrent signal
             if (this._currentHeartbeat != null) {
                 return await this._currentHeartbeat;
             }
@@ -90,22 +91,21 @@ export class ModuleHeartbeat implements HeartbeatService {
     }
 
     /** Stop checking the module health. */
-    async destroy(): Promise<void> {
-        const baseName = sha256(this.moduleName);
+    async stop(): Promise<void> {
+        await deleteFile(this._fileName)
+    }
 
-        await Promise.all([
-            deleteFile(`${baseName}.beat`),
-            deleteFile(`${baseName}.check`),
-        ]);
+    toString(): string {
+        return `Heartbeat service for module: ${this.moduleName}`;
     }
     
     private async _writeHeartbeat(): Promise<void> {
         const payload: ModuleHeartbeatInfo = {
-            token: crypto.randomBytes(16).toString('hex'),
+            timestamp: Date.now(),
         };
 
         await writeFileJson(this._fileName, payload);
-        this._lastHeartbeatTimestamp = performance.now();
+        this._lastHeartbeatTimestamp = Date.now();
     }
 }
 
